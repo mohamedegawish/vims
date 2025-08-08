@@ -394,11 +394,11 @@ Class Master extends DBConnection {
 			$sql = "UPDATE `buses` SET {$data}, `date_updated` = CURRENT_TIMESTAMP() WHERE id = '{$id}' ";
 		}
 		$save = $this->conn->query($sql);
-		if($save){
+        if($save){
 			$bid = !empty($id) ? $id : $this->conn->insert_id;
 			$resp['id'] = $bid;
 			$resp['status'] = 'success';
-			$resp['msg'] = empty($id) ? 'تم إضافة الباص بنجاح' : 'تم تحديث بيانات الباص بنجاح';
+            $resp['msg'] = empty($id) ? 'تم إضافة الباص بنجاح' : 'تم التعديل بنجاح';
 		}else{
 			$resp['status'] = 'failed';
 			$resp['msg'] = 'An error occured.';

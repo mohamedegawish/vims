@@ -123,7 +123,11 @@ $(function(){
             },
             success:function(resp){
                 if(typeof resp =='object' && resp.status == 'success'){
-                    location.reload();
+                    if(typeof alert_toast === 'function'){
+                        alert_toast(resp.msg || 'تم التعديل بنجاح', 'success');
+                    }
+                    $('.modal').modal('hide');
+                    setTimeout(function(){ location.reload(); }, 1200);
                 }else if(resp.status == 'failed' && !!resp.msg){
                     el.addClass("alert-danger")
                     el.text(resp.msg)
