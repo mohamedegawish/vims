@@ -124,6 +124,15 @@ $buses = $conn->query("SELECT * FROM buses WHERE delete_flag = 0 ORDER BY date_c
             right: 12px;
         }
         .border-bottom { border-bottom: 1px solid #dee2e6 !important; }
+        /* توسعة الجدول ليملأ عرض الصفحة بالكامل */
+        #list { width: 100% !important; }
+        .dataTables_wrapper { width: 100% !important; }
+        .card, .card-body, .table-responsive { width: 100%; }
+        .content-wrapper > .content { padding: 0 !important; }
+        .content-wrapper .container-fluid { max-width: 100%; padding-left: 0 !important; padding-right: 0 !important; }
+        .card { margin: 0; border: none; box-shadow: none; border-radius: 0; }
+        .card-header { border-bottom: 1px solid #dee2e6; }
+        .table-responsive { margin: 0; padding: 0 10px; }
     </style>
     <script>var _base_url_ = '<?= base_url ?>';</script>
 </head>
@@ -432,8 +441,10 @@ $buses = $conn->query("SELECT * FROM buses WHERE delete_flag = 0 ORDER BY date_c
     $(document).ready(function(){
         // تهيئة DataTable
         var table = $('#list').DataTable({
-            responsive: true,
+            responsive: false,
             autoWidth: false,
+            scrollX: true,
+            pageLength: 50,
             language: {
                 url: '//cdn.datatables.net/plug-ins/1.10.21/i18n/Arabic.json'
             }
