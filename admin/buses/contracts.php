@@ -77,7 +77,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_contract'])){
         $_SESSION['error'] = 'حدث خطأ في الحفظ: ' . $conn->error;
     }
     
-    echo '<script>window.location.href = "'.$_SERVER['PHP_SELF'].'";</script>';
+    echo '<script>window.location.href = "'.(isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : $_SERVER['PHP_SELF']).'";</script>';
     exit;
 }
 
@@ -86,7 +86,7 @@ if(isset($_GET['delete'])){
     $id = (int)$_GET['delete'];
     $conn->query("DELETE FROM `contracts` WHERE `id` = '$id'");
     $_SESSION['success'] = 'تم حذف العقد بنجاح';
-    echo '<script>window.location.href = "'.$_SERVER['PHP_SELF'].'";</script>';
+    echo '<script>window.location.href = "'.(isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : $_SERVER['PHP_SELF']).'";</script>';
     exit;
 }
 
