@@ -76,8 +76,16 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_contract'])){
     } else {
         $_SESSION['error'] = 'حدث خطأ في الحفظ: ' . $conn->error;
     }
-    
-    echo '<script>window.location.href = "'.(isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : $_SERVER['PHP_SELF']).'";</script>';
+    // إعادة التوجيه مع إزالة باراميتر التعديل حتى لا يُعاد فتح النافذة
+    $uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : $_SERVER['PHP_SELF'];
+    $parsed = parse_url($uri);
+    $path = isset($parsed['path']) ? $parsed['path'] : '';
+    $params = [];
+    if(isset($parsed['query'])) parse_str($parsed['query'], $params);
+    unset($params['edit']);
+    $query = http_build_query($params);
+    $redirect_url = $path.(!empty($query) ? ('?'.$query) : '');
+    echo '<script>window.location.href = "'.$redirect_url.'";</script>';
     exit;
 }
 
@@ -86,7 +94,31 @@ if(isset($_GET['delete'])){
     $id = (int)$_GET['delete'];
     $conn->query("DELETE FROM `contracts` WHERE `id` = '$id'");
     $_SESSION['success'] = 'تم حذف العقد بنجاح';
-    echo '<script>window.location.href = "'.(isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : $_SERVER['PHP_SELF']).'";</script>';
+    // إعادة التوجيه مع إزالة باراميتر التعديل إن وُجد
+    $uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : $_SERVER['PHP_SELF'];
+    $parsed = parse_url($uri);
+    $path = isset($parsed['path']) ? $parsed['path'] : '';
+    $params = [];
+    if(isset($parsed['query'])) parse_str($parsed['query'], $params);
+    unset($params['edit']);
+    $query = http_build_query($params);
+    $redirect_url = $path.(!empty($query) ? ('?'.$query) : '');
+    echo '<script>window.location.href = "'.$redirect_url.'";</script>';
+    exit;
+}
+
+// جلب بيانات عقد واحد (للتحرير عبر AJAX)
+if(isset($_GET['get_contract'])){
+    header('Content-Type: application/json; charset=utf-8');
+    $id = (int)$_GET['get_contract'];
+    $resp = ['status' => 'error', 'msg' => 'عقد غير موجود'];
+    if($id > 0){
+        $qry = $conn->query("SELECT * FROM `contracts` WHERE `id` = '{$id}'");
+        if($qry && $qry->num_rows > 0){
+            $resp = ['status' => 'success', 'data' => $qry->fetch_assoc()];
+        }
+    }
+    echo json_encode($resp, JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -236,7 +268,7 @@ if(isset($_SESSION['error'])){
                                 </a>
                                 <div class="dropdown-divider"></div>
                                 <?php endif; ?>
-                                <a class="dropdown-item" href="?edit=<?php echo $row['id'] ?>" data-toggle="modal" data-target="#contractModal">
+                                <a class="dropdown-item edit_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>">
                                     <span class="fa fa-edit text-primary"></span> تعديل
                                 </a>
                                 <div class="dropdown-divider"></div>
@@ -254,7 +286,7 @@ if(isset($_SESSION['error'])){
 </div>
 
 <!-- نافذة إضافة/تعديل العقد -->
-<div class="modal fade" id="contractModal" tabindex="-1" role="dialog" aria-labelledby="contractModalLabel" aria-hidden="true">
+<div class="modal" id="contractModal" tabindex="-1" role="dialog" aria-labelledby="contractModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
@@ -377,22 +409,72 @@ $(document).ready(function(){
         _conf("هل أنت متأكد من حذف هذا العقد؟", "delete_contract", [id]);
     });
 
+    // فتح التعديل عبر AJAX وجلب البيانات (بدون طبقة تحميل عامة لتجنب بطء واجهة المستخدم)
+    $('.edit_data').on('click', function(){
+        var id = $(this).data('id');
+        // إبلاغ معالج show بأننا في وضع تعديل لتفادي إعادة تعيين الحقول
+        window.__contract_editing = true;
+        $('#contractModal .modal-title').text('تعديل العقد');
+        $('#contractModal').modal('show');
+        $.get('<?php echo base_url ?>admin/buses/contracts.php?get_contract='+id, function(res){
+            if(typeof res === 'string'){
+                try { res = JSON.parse(res); } catch(e) {}
+            }
+            if(res && res.status === 'success'){
+                var data = res.data || {};
+                // تعبئة البيانات مباشرة
+                $('#contractModal input[name="id"]').val(data.id || '');
+                $('#contractModal input[name="old_file_path"]').val(data.file_path || '');
+                $('#bus_id').val(data.bus_id || '');
+                $('#contract_type').val(data.contract_type || '');
+                $('#client_name').val(data.client_name || '');
+                $('#client_contact').val(data.client_contact || '');
+                $('#start_date').val(data.start_date || '');
+                $('#end_date').val(data.end_date || '');
+                $('#amount').val(data.amount || '');
+                $('#route_details').val(data.route_details || '');
+                $('#payment_terms').val(data.payment_terms || '');
+                $('#notes').val(data.notes || '');
+            }else{
+                alert_toast(res && res.msg ? res.msg : 'تعذر جلب بيانات العقد', 'error');
+            }
+        }).fail(function(){
+            alert_toast('فشل الاتصال بالخادم', 'error');
+        }).always(function(){
+            // إزالة العلامة بعد الفتح/التعبئة
+            window.__contract_editing = false;
+        });
+    });
+
     // إضافة كلاس للجدول
     $('.table td, .table th').addClass('py-1 px-2 align-middle');
 
-    // إعادة تعبئة النموذج عند فتحه للتعديل
+    // إعادة تعبئة النموذج عند فتحه يدويًا
     $('#contractModal').on('show.bs.modal', function (e) {
-        var button = $(e.relatedTarget);
-        var isEdit = button.attr('href') && button.attr('href').includes('edit=');
-        
+        var isEditParam = new URLSearchParams(window.location.search).has('edit');
+        var isEditTrigger = e.relatedTarget && $(e.relatedTarget).hasClass('edit_data');
+        var isEdit = isEditParam || isEditTrigger || window.__contract_editing === true;
         if(!isEdit){
-            // إعادة تعيين النموذج للإضافة
             $('#contractModal form')[0].reset();
             $('#contractModal .modal-title').text('إضافة عقد جديد');
             $('#contractModal input[name="id"]').val('');
             $('#contractModal input[name="old_file_path"]').val('');
+        } else {
+            $('#contractModal .modal-title').text('تعديل العقد');
         }
     });
+
+    // فتح النافذة تلقائياً عند وجود ?edit= في الرابط (حالة الوصول المباشر)
+    var params = new URLSearchParams(window.location.search);
+    if(params.has('edit')){
+        var id = params.get('edit');
+        if(id){
+            // افتح المودال بسرعة ثم اجلب البيانات وتعبئتها بدون مؤثرات لسرعة أعلى
+            $('#contractModal .modal-title').text('تعديل العقد');
+            $('#contractModal').modal({show:true, backdrop: true, keyboard: true});
+            $('.edit_data[data-id="'+id+'"]').trigger('click');
+        }
+    }
 });
 
 // دالة حذف العقد
