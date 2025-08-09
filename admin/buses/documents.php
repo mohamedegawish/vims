@@ -1,5 +1,8 @@
 <?php
 require_once(__DIR__.'/../../config.php');
+if(!isset($conn)){
+    @include_once(__DIR__.'/../../initialize.php');
+}
 if(!isset($_SESSION)) session_start();
 if(!isset($_SESSION['userdata'])){
     echo '<script>window.location.href = "'.base_url.'login.php";</script>';
@@ -83,11 +86,26 @@ if(isset($_GET['delete'])){
 // جلب بيانات مستند واحد عبر AJAX
 if(isset($_GET['get_document'])){
     $id = (int)$_GET['get_document'];
-    $qry = $conn->query("SELECT * FROM `bus_documents` WHERE `id` = '$id'");
+    $qry = $conn->query("SELECT d.*, b.bus_number, b.plate_number FROM `bus_documents` d JOIN `buses` b ON d.bus_id = b.id WHERE d.id = '$id'");
     $resp = [ 'status' => 'failed' ];
     if($qry && $qry->num_rows > 0){
+        $row = $qry->fetch_assoc();
+        // حدد الامتداد
+        $row['file_ext'] = !empty($row['file_path']) ? strtolower(pathinfo($row['file_path'], PATHINFO_EXTENSION)) : '';
+        // حاول بناء رابط الملف الصحيح عبر مسارات محتملة
+        $row['file_url'] = '';
+        if(!empty($row['file_path'])){
+            $rel = ltrim($row['file_path'], '/');
+            $candidates = [
+                [ base_app.$rel, base_url.$rel ],
+                [ base_app.'admin/'.$rel, base_url.'admin/'.$rel ],
+            ];
+            foreach($candidates as $c){
+                if(is_file($c[0])){ $row['file_url'] = $c[1]; break; }
+            }
+        }
         $resp['status'] = 'success';
-        $resp['data'] = $qry->fetch_assoc();
+        $resp['data'] = $row;
     }
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode($resp);
@@ -228,7 +246,7 @@ if(isset($_SESSION['error'])){
                         <td align="center">
                             <div class="action-icons">
                                 <?php if(!empty($row['file_path'])): ?>
-                                <a href="#" class="text-primary preview-document" data-file="<?php echo base_url.$row['file_path'] ?>" data-type="<?php echo $ext ?? '' ?>">
+                                <a href="#" class="text-primary preview-document" data-id="<?php echo $row['id'] ?>">
                                     <i class="fas fa-eye <?php echo $file_icon ?>"></i>
                                 </a>
                                 <?php endif; ?>
@@ -335,13 +353,39 @@ if(isset($_SESSION['error'])){
     <div class="modal-dialog modal-xl" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">معاينة المستند</h5>
+                <h5 class="modal-title" id="previewTitle">معاينة المستند</h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
             <div class="modal-body">
-                <!-- سيتم ملؤه بالجافاسكريبت -->
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="border rounded p-3 mb-3">
+                            <dl class="row mb-0">
+                                <dt class="col-5">الباص:</dt>
+                                <dd class="col-7" id="p_bus"></dd>
+                                <dt class="col-5">نوع المستند:</dt>
+                                <dd class="col-7" id="p_type"></dd>
+                                <dt class="col-5">رقم المستند:</dt>
+                                <dd class="col-7" id="p_number"></dd>
+                                <dt class="col-5">تاريخ الإصدار:</dt>
+                                <dd class="col-7" id="p_issue"></dd>
+                                <dt class="col-5">تاريخ الانتهاء:</dt>
+                                <dd class="col-7" id="p_expiry"></dd>
+                                <dt class="col-5">ملاحظات:</dt>
+                                <dd class="col-7" id="p_notes"></dd>
+                                <dt class="col-5">الملف:</dt>
+                                <dd class="col-7" id="p_file"></dd>
+                            </dl>
+                        </div>
+                    </div>
+                    <div class="col-md-8">
+                        <div class="preview-container" style="height: 75vh;">
+                            <!-- سيتم وضع المعاينة هنا -->
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">إغلاق</button>
@@ -422,28 +466,79 @@ $(document).ready(function(){
         });
     });
 
-    // معاينة المستند
-    $('.preview-document').click(function(e){
+    // معاينة المستند (تفويض أحداث + جلب كافة البيانات)
+    $(document).on('click', '.preview-document', function(e){
         e.preventDefault();
-        var fileUrl = $(this).data('file');
-        var fileType = $(this).data('type');
-        var modalBody = $('#previewModal .modal-body');
-        
-        modalBody.empty();
-        
-        if(fileType === 'pdf'){
-            modalBody.html('<iframe src="'+fileUrl+'"></iframe>');
-        } else if(['jpg', 'jpeg', 'png'].includes(fileType)){
-            modalBody.html('<img src="'+fileUrl+'" alt="Document Preview">');
-        } else {
-            // للملفات الأخرى مثل Word، نعرض رابط للتحميل
-            modalBody.html('<div class="text-center p-5">'+
-                '<p class="lead">لا يمكن معاينة هذا النوع من الملفات مباشرة</p>'+
-                '<a href="'+fileUrl+'" class="btn btn-primary" download>تحميل الملف</a>'+
-                '</div>');
-        }
-        
-        $('#previewModal').modal('show');
+        var id = $(this).data('id');
+        start_loader();
+        $.ajax({
+            url: API_URL,
+            method: 'GET',
+            dataType: 'json',
+            data: { get_document: id },
+            success: function(resp){
+                end_loader();
+                if(resp && resp.status === 'success' && resp.data){
+                    var d = resp.data;
+                    var fileUrl = d.file_url || '';
+                    var ext = (d.file_ext || '').toLowerCase();
+
+                    // تعبئة معلومات الجانب الأيسر
+                    $('#previewTitle').text('معاينة المستند #' + d.id);
+                    $('#p_bus').text((d.bus_number || '') + (d.plate_number ? ' ('+d.plate_number+')' : ''));
+                    $('#p_type').text(d.document_type || '');
+                    $('#p_number').text(d.document_number || '');
+                    $('#p_issue').text(d.issue_date || '');
+                    $('#p_expiry').text(d.expiry_date || '');
+                    $('#p_notes').text(d.notes || '');
+                    if(fileUrl){
+                        $('#p_file').html('<a href="'+fileUrl+'" target="_blank">'+(d.file_path.split('/').pop())+'</a>');
+                    }else{
+                        $('#p_file').text('-');
+                    }
+
+                    // إعداد المعاينة
+                    var container = $('#previewModal .preview-container');
+                    container.empty();
+                    switch(ext){
+                        case 'pdf':
+                            container.html('<iframe src="'+fileUrl+'" style="width:100%; height:100%; border:none;"></iframe>');
+                            break;
+                        case 'png':
+                        case 'jpg':
+                        case 'jpeg':
+                        case 'gif':
+                        case 'webp':
+                            container.html('<img src="'+fileUrl+'" alt="Document Preview" style="max-width:100%; max-height:100%; object-fit:contain;">');
+                            break;
+                        case 'doc':
+                        case 'docx':
+                            container.html('<div class="text-center p-5">'+
+                                '<p class="lead">يتم فتح ملفات Word عبر عارض Google</p>'+
+                                '<iframe src="https://docs.google.com/gview?embedded=1&url='+encodeURIComponent(fileUrl)+'" style="width:100%; height:100%; border:none;"></iframe>'+
+                            '</div>');
+                            break;
+                        default:
+                            if(fileUrl){
+                                container.html('<div class="text-center p-5">'+
+                                    '<p class="lead">نوع الملف غير مدعوم للمعاينة المباشرة</p>'+
+                                    '<a href="'+fileUrl+'" class="btn btn-primary" target="_blank">فتح / تحميل الملف</a>'+
+                                '</div>');
+                            }else{
+                                container.html('<div class="text-center p-5 text-muted">لا يوجد ملف مرفق</div>');
+                            }
+                    }
+
+                    $('#previewModal').modal('show');
+                }else{
+                    alert_toast('تعذر تحميل بيانات المستند', 'error');
+                }
+            },
+            error: function(){
+                end_loader();
+                alert_toast('تعذر الاتصال بالخادم', 'error');
+            }
+        });
     });
 });
 
