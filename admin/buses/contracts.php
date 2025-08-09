@@ -404,7 +404,7 @@ $(document).ready(function(){
     });
 
     // معالجة حذف العقد
-    $('.delete_data').click(function(){
+    $(document).on('click', '.delete_data', function(){
         var id = $(this).data('id');
         _conf("هل أنت متأكد من حذف هذا العقد؟", "delete_contract", [id]);
     });
@@ -481,7 +481,7 @@ $(document).ready(function(){
 function delete_contract(id){
     start_loader();
     $.ajax({
-        url: '?delete='+id,
+        url: '<?php echo base_url ?>admin/buses/contracts.php?delete='+id,
         method: 'GET',
         success: function(){
             window.location.reload();
