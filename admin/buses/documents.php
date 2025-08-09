@@ -80,6 +80,20 @@ if(isset($_GET['delete'])){
     exit;
 }
 
+// جلب بيانات مستند واحد عبر AJAX
+if(isset($_GET['get_document'])){
+    $id = (int)$_GET['get_document'];
+    $qry = $conn->query("SELECT * FROM `bus_documents` WHERE `id` = '$id'");
+    $resp = [ 'status' => 'failed' ];
+    if($qry && $qry->num_rows > 0){
+        $resp['status'] = 'success';
+        $resp['data'] = $qry->fetch_assoc();
+    }
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($resp);
+    exit;
+}
+
 // جلب بيانات المستند للتعديل
 $document_data = array();
 if(isset($_GET['edit'])){
@@ -218,7 +232,7 @@ if(isset($_SESSION['error'])){
                                     <i class="fas fa-eye <?php echo $file_icon ?>"></i>
                                 </a>
                                 <?php endif; ?>
-                                <a href="?edit=<?php echo $row['id'] ?>" data-toggle="modal" data-target="#documentModal" class="text-info">
+                                <a href="javascript:void(0)" class="text-info edit_data" data-id="<?php echo $row['id'] ?>">
                                     <i class="fas fa-edit"></i>
                                 </a>
                                 <a href="javascript:void(0)" class="text-danger delete_data" data-id="<?php echo $row['id'] ?>">
@@ -295,9 +309,9 @@ if(isset($_SESSION['error'])){
                                 <div class="form-group">
                                     <label for="file_path" class="control-label">رفع الملف</label>
                                     <input type="file" name="file_path" id="file_path" class="form-control form-control-sm rounded-0" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
-                                    <?php if(isset($document_data['file_path']) && !empty($document_data['file_path'])): ?>
-                                        <small class="text-muted">الملف الحالي: <?php echo basename($document_data['file_path']) ?></small>
-                                    <?php endif; ?>
+                                    <small id="current_file_info" class="text-muted" style="display: <?php echo isset($document_data['file_path']) && !empty($document_data['file_path']) ? 'inline' : 'none'; ?>;">
+                                        <?php echo isset($document_data['file_path']) && !empty($document_data['file_path']) ? 'الملف الحالي: '.basename($document_data['file_path']) : '' ?>
+                                    </small>
                                 </div>
                             </div>
                         </div>
@@ -337,6 +351,7 @@ if(isset($_SESSION['error'])){
 </div>
 
 <script>
+const PAGE_URL = '<?php echo base_url ?>admin/index.php?page=buses/documents';
 $(document).ready(function(){
     // تهيئة جدول البيانات
     $('#list').dataTable({
@@ -354,18 +369,48 @@ $(document).ready(function(){
     // إضافة كلاس للجدول
     $('.table td, .table th').addClass('py-1 px-2 align-middle');
 
-    // إعادة تعبئة النموذج عند فتحه للتعديل
-    $('#documentModal').on('show.bs.modal', function (e) {
-        var button = $(e.relatedTarget);
-        var isEdit = button.attr('href') && button.attr('href').includes('edit=');
-        
-        if(!isEdit){
-            // إعادة تعيين النموذج للإضافة
+    // إعادة تعبئة النموذج عند فتحه (يتم التمييز عبر وجود قيمة في حقل id)
+    $('#documentModal').on('show.bs.modal', function () {
+        var isEditMode = !!$('#documentModal input[name="id"]').val();
+        if(!isEditMode){
             $('#documentModal form')[0].reset();
-            $('#documentModal .modal-title').text('إضافة مستند جديد');
+            $('#documentModalLabel').text('إضافة مستند جديد');
             $('#documentModal input[name="id"]').val('');
             $('#documentModal input[name="old_file_path"]').val('');
+            $('#current_file_info').hide().text('');
         }
+    });
+
+    // فتح نموذج التعديل وجلب البيانات
+    $('.edit_data').on('click', function(){
+        var id = $(this).data('id');
+        start_loader();
+        $.get(PAGE_URL + '&get_document=' + id, function(resp){
+            end_loader();
+            if(resp && resp.status === 'success' && resp.data){
+                var d = resp.data;
+                $('#documentModalLabel').text('تعديل المستند');
+                $('#documentModal input[name="id"]').val(d.id);
+                $('#bus_id').val(d.bus_id).trigger('change');
+                $('#document_type').val(d.document_type).trigger('change');
+                $('#document_number').val(d.document_number);
+                $('#issue_date').val(d.issue_date);
+                $('#expiry_date').val(d.expiry_date);
+                $('#notes').val(d.notes || '');
+                $('#documentModal input[name="old_file_path"]').val(d.file_path || '');
+                if(d.file_path){
+                    $('#current_file_info').text('الملف الحالي: ' + d.file_path.split('/').pop()).show();
+                }else{
+                    $('#current_file_info').hide().text('');
+                }
+                $('#documentModal').modal('show');
+            }else{
+                alert_toast('تعذر تحميل بيانات المستند', 'error');
+            }
+        }).fail(function(){
+            end_loader();
+            alert_toast('تعذر الاتصال بالخادم', 'error');
+        });
     });
 
     // معاينة المستند
@@ -397,10 +442,10 @@ $(document).ready(function(){
 function delete_document(id){
     start_loader();
     $.ajax({
-        url: '?delete='+id,
+        url: PAGE_URL + '&delete=' + id,
         method: 'GET',
         success: function(){
-            window.location.reload();
+            window.location.href = PAGE_URL;
         },
         error: function(){
             alert_toast("حدث خطأ أثناء الحذف", "error");
