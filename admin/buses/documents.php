@@ -352,6 +352,7 @@ if(isset($_SESSION['error'])){
 
 <script>
 const PAGE_URL = '<?php echo base_url ?>admin/index.php?page=buses/documents';
+const API_URL = '<?php echo base_url ?>admin/buses/documents.php';
 $(document).ready(function(){
     // تهيئة جدول البيانات
     $('#list').dataTable({
@@ -360,8 +361,8 @@ $(document).ready(function(){
         }
     });
 
-    // معالجة حذف المستند
-    $('.delete_data').click(function(){
+    // معالجة حذف المستند (باستخدام تفويض الأحداث ليتوافق مع إعادة رسم DataTables)
+    $(document).on('click', '.delete_data', function(){
         var id = $(this).data('id');
         _conf("هل أنت متأكد من حذف هذا المستند؟", "delete_document", [id]);
     });
@@ -381,35 +382,43 @@ $(document).ready(function(){
         }
     });
 
-    // فتح نموذج التعديل وجلب البيانات
-    $('.edit_data').on('click', function(){
+    // فتح نموذج التعديل وجلب البيانات (تفويض أحداث)
+    $(document).on('click', '.edit_data', function(e){
+        e.preventDefault();
         var id = $(this).data('id');
         start_loader();
-        $.get(PAGE_URL + '&get_document=' + id, function(resp){
-            end_loader();
-            if(resp && resp.status === 'success' && resp.data){
-                var d = resp.data;
-                $('#documentModalLabel').text('تعديل المستند');
-                $('#documentModal input[name="id"]').val(d.id);
-                $('#bus_id').val(d.bus_id).trigger('change');
-                $('#document_type').val(d.document_type).trigger('change');
-                $('#document_number').val(d.document_number);
-                $('#issue_date').val(d.issue_date);
-                $('#expiry_date').val(d.expiry_date);
-                $('#notes').val(d.notes || '');
-                $('#documentModal input[name="old_file_path"]').val(d.file_path || '');
-                if(d.file_path){
-                    $('#current_file_info').text('الملف الحالي: ' + d.file_path.split('/').pop()).show();
+        $.ajax({
+            url: API_URL,
+            method: 'GET',
+            dataType: 'json',
+            data: { get_document: id },
+            success: function(resp){
+                end_loader();
+                if(resp && resp.status === 'success' && resp.data){
+                    var d = resp.data;
+                    $('#documentModalLabel').text('تعديل المستند');
+                    $('#documentModal input[name="id"]').val(d.id);
+                    $('#bus_id').val(d.bus_id).trigger('change');
+                    $('#document_type').val(d.document_type).trigger('change');
+                    $('#document_number').val(d.document_number);
+                    $('#issue_date').val(d.issue_date);
+                    $('#expiry_date').val(d.expiry_date);
+                    $('#notes').val(d.notes || '');
+                    $('#documentModal input[name="old_file_path"]').val(d.file_path || '');
+                    if(d.file_path){
+                        $('#current_file_info').text('الملف الحالي: ' + d.file_path.split('/').pop()).show();
+                    }else{
+                        $('#current_file_info').hide().text('');
+                    }
+                    $('#documentModal').modal('show');
                 }else{
-                    $('#current_file_info').hide().text('');
+                    alert_toast('تعذر تحميل بيانات المستند', 'error');
                 }
-                $('#documentModal').modal('show');
-            }else{
-                alert_toast('تعذر تحميل بيانات المستند', 'error');
+            },
+            error: function(){
+                end_loader();
+                alert_toast('تعذر الاتصال بالخادم', 'error');
             }
-        }).fail(function(){
-            end_loader();
-            alert_toast('تعذر الاتصال بالخادم', 'error');
         });
     });
 
@@ -442,7 +451,7 @@ $(document).ready(function(){
 function delete_document(id){
     start_loader();
     $.ajax({
-        url: PAGE_URL + '&delete=' + id,
+        url: API_URL + '?delete=' + id,
         method: 'GET',
         success: function(){
             window.location.href = PAGE_URL;
