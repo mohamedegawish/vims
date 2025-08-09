@@ -193,6 +193,7 @@ if(isset($_SESSION['error'])){
     </div>
     <div class="card-body">
         <div class="container-fluid">
+            <div class="table-responsive">
             <table class="table table-hover table-striped table-bordered" id="list">
                 <colgroup>
                     <col width="5%">
@@ -262,6 +263,7 @@ if(isset($_SESSION['error'])){
                     <?php endwhile; ?>
                 </tbody>
             </table>
+            </div>
         </div>
     </div>
 </div>
@@ -398,10 +400,13 @@ if(isset($_SESSION['error'])){
 const PAGE_URL = '<?php echo base_url ?>admin/index.php?page=buses/documents';
 const API_URL = '<?php echo base_url ?>admin/buses/documents.php';
 $(document).ready(function(){
-    // تهيئة جدول البيانات
-    $('#list').dataTable({
-        "language": {
-            "url": "//cdn.datatables.net/plug-ins/1.10.21/i18n/Arabic.json"
+    // تهيئة جدول البيانات مع دعم الاستجابة
+    $('#list').DataTable({
+        responsive: true,
+        autoWidth: false,
+        scrollX: true,
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.10.21/i18n/Arabic.json'
         }
     });
 
