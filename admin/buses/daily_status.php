@@ -72,6 +72,11 @@ if(isset($_GET['edit'])){
 // جلب قائمة الباصات
 $buses = $conn->query("SELECT `id`, `bus_number`, `plate_number` FROM `buses` WHERE `delete_flag` = 0 ORDER BY `bus_number`");
 
+// فلاتر العرض
+$filter_date = isset($_GET['date']) ? $conn->real_escape_string($_GET['date']) : '';
+$filter_bus = isset($_GET['bus']) && $_GET['bus'] !== '' ? (int)$_GET['bus'] : 0;
+$filter_status = isset($_GET['status']) ? $conn->real_escape_string($_GET['status']) : '';
+
 // معالجة رسائل النجاح/الخطأ
 if(isset($_SESSION['success'])){
     echo '<script>alert_toast("'.$_SESSION['success'].'", "success")</script>';
@@ -132,45 +137,45 @@ if(isset($_SESSION['error'])){
     <div class="card-body">
         <div class="container-fluid">
             <div class="row mb-3">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="form-group">
                         <label for="filter_date">فلترة حسب التاريخ</label>
-                        <div class="input-group">
-                            <input type="date" id="filter_date" class="form-control form-control-sm">
-                            <div class="input-group-append">
-                                <button class="btn btn-sm btn-primary" onclick="filterByDate()">
-                                    <i class="fas fa-filter"></i>
-                                </button>
-                                <button class="btn btn-sm btn-secondary" onclick="resetFilter()">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            </div>
-                        </div>
+                        <input type="date" id="filter_date" class="form-control form-control-sm" value="<?php echo htmlspecialchars($filter_date); ?>">
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="form-group">
                         <label for="filter_bus">فلترة حسب الباص</label>
                         <select id="filter_bus" class="form-control form-control-sm">
                             <option value="">كل الباصات</option>
                             <?php while($bus = $buses->fetch_assoc()): ?>
-                            <option value="<?php echo $bus['id'] ?>">
+                            <option value="<?php echo $bus['id'] ?>" <?php echo ($filter_bus == $bus['id']) ? 'selected' : '' ?>>
                                 <?php echo $bus['bus_number'].' ('.$bus['plate_number'].')' ?>
                             </option>
                             <?php endwhile; ?>
                         </select>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="form-group">
                         <label for="filter_status">فلترة حسب الحالة</label>
                         <select id="filter_status" class="form-control form-control-sm">
-                            <option value="">كل الحالات</option>
-                            <option value="available">متاح</option>
-                            <option value="reserved">محجوز</option>
-                            <option value="maintenance">صيانة</option>
-                            <option value="out_of_service">خارج الخدمة</option>
+                            <option value="" <?php echo $filter_status == '' ? 'selected' : '' ?>>كل الحالات</option>
+                            <option value="available" <?php echo $filter_status == 'available' ? 'selected' : '' ?>>متاح</option>
+                            <option value="reserved" <?php echo $filter_status == 'reserved' ? 'selected' : '' ?>>محجوز</option>
+                            <option value="maintenance" <?php echo $filter_status == 'maintenance' ? 'selected' : '' ?>>صيانة</option>
+                            <option value="out_of_service" <?php echo $filter_status == 'out_of_service' ? 'selected' : '' ?>>خارج الخدمة</option>
                         </select>
+                    </div>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <div class="form-group mb-0 ml-auto">
+                        <button class="btn btn-primary btn-sm" onclick="filterByDate()">
+                            <i class="fas fa-filter"></i> تطبيق الفلتر
+                        </button>
+                        <button class="btn btn-secondary btn-sm ml-2" onclick="resetFilter()">
+                            <i class="fas fa-times"></i> إعادة تعيين
+                        </button>
                     </div>
                 </div>
             </div>
@@ -201,10 +206,15 @@ if(isset($_SESSION['error'])){
                 <tbody>
                     <?php 
                     $i = 1;
+                    $conditions = ["b.delete_flag = 0"]; 
+                    if(!empty($filter_date)) $conditions[] = "s.status_date = '{$filter_date}'";
+                    if(!empty($filter_bus)) $conditions[] = "s.bus_id = '{$filter_bus}'";
+                    if(!empty($filter_status)) $conditions[] = "s.status = '{$filter_status}'";
+                    $where_sql = 'WHERE '.implode(' AND ', $conditions);
                     $qry = $conn->query("SELECT s.*, b.bus_number, b.plate_number 
                                         FROM `bus_status` s 
                                         JOIN `buses` b ON s.bus_id = b.id 
-                                        WHERE b.delete_flag = 0 
+                                        {$where_sql}
                                         ORDER BY s.status_date DESC, s.date_updated DESC");
                     while($row = $qry->fetch_assoc()):
                         $status_badge = '';
@@ -401,18 +411,21 @@ function filterByDate(){
     var date = $('#filter_date').val();
     var bus = $('#filter_bus').val();
     var status = $('#filter_status').val();
-    
-    var url = '?';
-    if(date) url += 'date=' + date + '&';
-    if(bus) url += 'bus=' + bus + '&';
-    if(status) url += 'status=' + status;
-    
+    var base = '<?php echo base_url?>admin/index.php?page=buses/daily_status';
+
+    var params = [];
+    if(date) params.push('date=' + encodeURIComponent(date));
+    if(bus) params.push('bus=' + encodeURIComponent(bus));
+    if(status) params.push('status=' + encodeURIComponent(status));
+
+    var url = base + (params.length ? ('&' + params.join('&')) : '');
     window.location.href = url;
 }
 
 // إعادة تعيين الفلتر
 function resetFilter(){
-    window.location.href = '?';
+    var base = '<?php echo base_url?>admin/index.php?page=buses/daily_status';
+    window.location.href = base;
 }
 
 // إنشاء تقرير PDF
