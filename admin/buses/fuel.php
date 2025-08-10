@@ -204,9 +204,23 @@ if(isset($_SESSION['error'])){
                         <td><?php echo $row['driver_name'] ?></td>
                         <td align="center">
                             <?php if(!empty($row['receipt_path'])): ?>
-                            <a href="<?php echo base_url.$row['receipt_path'] ?>" target="_blank" class="mr-2">
-                                <span class="fas fa-receipt receipt-icon" title="عرض الفاتورة"></span>
-                            </a>
+                                <?php 
+                                    $receipt_url = '';
+                                    $rel = ltrim($row['receipt_path'], '/');
+                                    $candidates = [
+                                        [ base_app.$rel, base_url.$rel ],
+                                        [ base_app.'admin/'.$rel, base_url.'admin/'.$rel ],
+                                        [ base_app.'admin/buses/'.$rel, base_url.'admin/buses/'.$rel ],
+                                    ];
+                                    foreach($candidates as $c){
+                                        if(is_file($c[0])){ $receipt_url = $c[1]; break; }
+                                    }
+                                ?>
+                                <?php if(!empty($receipt_url)): ?>
+                                <a href="<?php echo $receipt_url ?>" target="_blank" class="mr-2">
+                                    <span class="fas fa-receipt receipt-icon" title="عرض الفاتورة"></span>
+                                </a>
+                                <?php endif; ?>
                             <?php endif; ?>
                             <button type="button" class="btn btn-flat btn-default btn-sm dropdown-toggle dropdown-icon" data-toggle="dropdown">
                                 إجراءات
