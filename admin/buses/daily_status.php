@@ -353,14 +353,19 @@ $(document).ready(function(){
     // إعادة تعبئة النموذج عند فتحه للتعديل
     $('#statusModal').on('show.bs.modal', function (e) {
         var button = $(e.relatedTarget);
-        var isEdit = button.attr('href') && button.attr('href').includes('edit=');
-        
+        var isEditParam = new URLSearchParams(window.location.search).has('edit');
+        var hasHiddenId = ($('#statusModal input[name="id"]').val() || '').toString().trim() !== '';
+        var isEditTrigger = button && button.attr('href') && button.attr('href').includes('edit=');
+        var isEdit = isEditParam || hasHiddenId || isEditTrigger;
+
         if(!isEdit){
             // إعادة تعيين النموذج للإضافة
             $('#statusModal form')[0].reset();
             $('#statusModal .modal-title').text('تسجيل حالة جديدة');
             $('#statusModal input[name="id"]').val('');
             $('#statusModal #status_date').val(new Date().toISOString().split('T')[0]);
+        } else {
+            $('#statusModal .modal-title').text('تعديل الحالة اليومية');
         }
     });
 
