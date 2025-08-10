@@ -75,7 +75,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_maintenance'])){
         $_SESSION['error'] = 'حدث خطأ في الحفظ: ' . $conn->error;
     }
     
-    echo '<script>window.location.href = "'.$_SERVER['PHP_SELF'].'";</script>';
+    echo '<script>window.location.href = "'.base_url.'admin/index.php?page=buses/maintenance";</script>';
     exit;
 }
 
@@ -84,7 +84,7 @@ if(isset($_GET['delete'])){
     $id = (int)$_GET['delete'];
     $conn->query("DELETE FROM `maintenance_work` WHERE `id` = '$id'");
     $_SESSION['success'] = 'تم حذف سجل الصيانة بنجاح';
-    echo '<script>window.location.href = "'.$_SERVER['PHP_SELF'].'";</script>';
+    echo '<script>window.location.href = "'.base_url.'admin/index.php?page=buses/maintenance";</script>';
     exit;
 }
 
