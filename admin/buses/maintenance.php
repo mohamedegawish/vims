@@ -96,6 +96,27 @@ if(isset($_GET['edit'])){
     $maintenance_data = $qry->fetch_assoc();
 }
 
+// جلب بيانات الصيانة للعرض
+$view_data = array();
+if(isset($_GET['view'])){
+    $id = (int)$_GET['view'];
+    $qry = $conn->query("SELECT m.*, b.bus_number, b.plate_number FROM `maintenance_work` m JOIN `buses` b ON m.bus_id = b.id WHERE m.id = '$id'");
+    if($qry){
+        $view_data = $qry->fetch_assoc();
+        // تجهيز رابط الفاتورة للعرض إن وجد
+        if(!empty($view_data['invoice_path'])){
+            $rel = ltrim($view_data['invoice_path'], '/');
+            $candidates = [
+                [ base_app.$rel, base_url.$rel ],
+                [ base_app.'admin/'.$rel, base_url.'admin/'.$rel ],
+            ];
+            foreach($candidates as $c){
+                if(is_file($c[0])){ $view_data['invoice_url'] = $c[1]; break; }
+            }
+        }
+    }
+}
+
 // جلب قائمة الباصات
 $buses = $conn->query("SELECT `id`, `bus_number`, `plate_number` FROM `buses` WHERE `delete_flag` = 0 ORDER BY `bus_number`");
 
@@ -189,7 +210,17 @@ if(isset($_SESSION['error'])){
                     while($row = $qry->fetch_assoc()):
                         // تحديد أيقونة الفاتورة
                         $file_icon = '';
+                        $invoice_url = '';
                         if(!empty($row['invoice_path'])){
+                            // محاولة تحديد رابط الفاتورة الصحيح حسب مكان الحفظ
+                            $rel = ltrim($row['invoice_path'], '/');
+                            $candidates = [
+                                [ base_app.$rel, base_url.$rel ],
+                                [ base_app.'admin/'.$rel, base_url.'admin/'.$rel ],
+                            ];
+                            foreach($candidates as $c){
+                                if(is_file($c[0])){ $invoice_url = $c[1]; break; }
+                            }
                             $ext = pathinfo($row['invoice_path'], PATHINFO_EXTENSION);
                             if($ext == 'pdf'){
                                 $file_icon = '<span class="fas fa-file-pdf document-icon pdf-icon" title="PDF"></span>';
@@ -218,12 +249,16 @@ if(isset($_SESSION['error'])){
                                 إجراءات
                             </button>
                             <div class="dropdown-menu" role="menu">
-                                <?php if(!empty($row['invoice_path'])): ?>
-                                <a class="dropdown-item" href="<?php echo base_url.$row['invoice_path'] ?>" target="_blank">
+                                <?php if(!empty($invoice_url)): ?>
+                                <a class="dropdown-item" href="<?php echo $invoice_url ?>" target="_blank">
                                     <span class="fa fa-eye text-dark"></span> عرض الفاتورة
                                 </a>
                                 <div class="dropdown-divider"></div>
                                 <?php endif; ?>
+                                <a class="dropdown-item" href="<?php echo base_url.'admin/index.php?page=buses/maintenance&view='.$row['id'] ?>">
+                                    <span class="fa fa-eye text-info"></span> عرض التفاصيل
+                                </a>
+                                <div class="dropdown-divider"></div>
                                 <a class="dropdown-item" href="<?php echo base_url.'admin/index.php?page=buses/maintenance&edit='.$row['id'] ?>">
                                     <span class="fa fa-edit text-primary"></span> تعديل
                                 </a>
@@ -341,6 +376,49 @@ if(isset($_SESSION['error'])){
     </div>
 </div>
 
+<!-- نافذة عرض تفاصيل الصيانة -->
+<div class="modal fade" id="maintenanceViewModal" tabindex="-1" role="dialog" aria-labelledby="maintenanceViewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="maintenanceViewModalLabel">تفاصيل سجل الصيانة</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="container-fluid">
+                    <?php if(!empty($view_data)): ?>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>الباص:</strong> <?php echo htmlspecialchars($view_data['bus_number'].' ('.$view_data['plate_number'].')'); ?></p>
+                            <p><strong>نوع الصيانة:</strong> <?php echo htmlspecialchars($view_data['maintenance_type']); ?></p>
+                            <p><strong>تفاصيل العمل:</strong><br><?php echo nl2br(htmlspecialchars($view_data['work_details'])); ?></p>
+                            <p><strong>ملاحظات:</strong><br><?php echo nl2br(htmlspecialchars($view_data['notes'])); ?></p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>تاريخ الصيانة:</strong> <?php echo htmlspecialchars($view_data['work_date']); ?></p>
+                            <p><strong>عدد الكيلومترات:</strong> <?php echo number_format((float)$view_data['work_km']); ?> كم</p>
+                            <p><strong>التكلفة:</strong> <?php echo number_format((float)$view_data['cost'], 2).' ر.س'; ?></p>
+                            <p><strong>اسم الورشة:</strong> <?php echo htmlspecialchars($view_data['workshop_name']); ?></p>
+                            <p><strong>اتصال الورشة:</strong> <?php echo htmlspecialchars($view_data['workshop_contact']); ?></p>
+                            <?php if(!empty($view_data['invoice_url'])): ?>
+                                <p><strong>الفاتورة:</strong> <a href="<?php echo $view_data['invoice_url']; ?>" target="_blank">عرض الملف</a></p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php else: ?>
+                        <div class="alert alert-warning mb-0">لا توجد بيانات لعرضها.</div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">إغلاق</button>
+            </div>
+        </div>
+    </div>
+    </div>
+
 <script>
 $(document).ready(function(){
     // تهيئة جدول البيانات
@@ -372,6 +450,11 @@ $(document).ready(function(){
             $('#maintenanceModal input[name="id"]').val('');
             $('#maintenanceModal input[name="old_invoice_path"]').val('');
         });
+    <?php endif; ?>
+
+    // فتح مودال العرض تلقائياً إذا وُجدت بيانات العرض
+    <?php if(isset($view_data['id']) && !empty($view_data['id'])): ?>
+        $('#maintenanceViewModal').modal('show');
     <?php endif; ?>
 });
 
