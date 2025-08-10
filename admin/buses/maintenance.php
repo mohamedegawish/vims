@@ -224,7 +224,7 @@ if(isset($_SESSION['error'])){
                                 </a>
                                 <div class="dropdown-divider"></div>
                                 <?php endif; ?>
-                                <a class="dropdown-item" href="?edit=<?php echo $row['id'] ?>" data-toggle="modal" data-target="#maintenanceModal">
+                                <a class="dropdown-item" href="<?php echo base_url.'admin/index.php?page=buses/maintenance&edit='.$row['id'] ?>">
                                     <span class="fa fa-edit text-primary"></span> تعديل
                                 </a>
                                 <div class="dropdown-divider"></div>
@@ -360,25 +360,26 @@ $(document).ready(function(){
     $('.table td, .table th').addClass('py-1 px-2 align-middle');
 
     // إعادة تعبئة النموذج عند فتحه للتعديل
-    $('#maintenanceModal').on('show.bs.modal', function (e) {
-        var button = $(e.relatedTarget);
-        var isEdit = button.attr('href') && button.attr('href').includes('edit=');
-        
-        if(!isEdit){
-            // إعادة تعيين النموذج للإضافة
+    // إذا كان هناك معرّف للتعديل في الحقل المخفي، افتح المودال تلقائياً لعرض البيانات القديمة
+    <?php if(isset($maintenance_data['id']) && !empty($maintenance_data['id'])): ?>
+        $('#maintenanceModal').modal('show');
+        $('#maintenanceModal .modal-title').text('تعديل سجل الصيانة');
+    <?php else: ?>
+        // عند فتح المودال بدون وضع التعديل، نظّف الحقول
+        $('#maintenanceModal').on('show.bs.modal', function () {
             $('#maintenanceModal form')[0].reset();
             $('#maintenanceModal .modal-title').text('إضافة سجل صيانة جديد');
             $('#maintenanceModal input[name="id"]').val('');
             $('#maintenanceModal input[name="old_invoice_path"]').val('');
-        }
-    });
+        });
+    <?php endif; ?>
 });
 
 // دالة حذف الصيانة
 function delete_maintenance(id){
     start_loader();
     $.ajax({
-        url: '?delete='+id,
+        url: '<?php echo base_url?>admin/index.php?page=buses/maintenance&delete='+id,
         method: 'GET',
         success: function(){
             window.location.reload();
