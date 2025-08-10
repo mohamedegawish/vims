@@ -77,7 +77,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_fuel'])){
         $_SESSION['error'] = 'حدث خطأ في الحفظ: ' . $conn->error;
     }
     
-    echo '<script>window.location.href = "'.$_SERVER['PHP_SELF'].'";</script>';
+    echo '<script>window.location.href = "'.base_url.'admin/index.php?page=buses/fuel";</script>';
     exit;
 }
 
@@ -86,7 +86,7 @@ if(isset($_GET['delete'])){
     $id = (int)$_GET['delete'];
     $conn->query("DELETE FROM `fuel_records` WHERE `id` = '$id'");
     $_SESSION['success'] = 'تم حذف سجل الوقود بنجاح';
-    echo '<script>window.location.href = "'.$_SERVER['PHP_SELF'].'";</script>';
+    echo '<script>window.location.href = "'.base_url.'admin/index.php?page=buses/fuel";</script>';
     exit;
 }
 
