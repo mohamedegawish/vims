@@ -211,7 +211,7 @@ if(isset($_SESSION['error'])){
                                 إجراءات
                             </button>
                             <div class="dropdown-menu" role="menu">
-                                <a class="dropdown-item" href="?edit=<?php echo $row['id'] ?>" data-toggle="modal" data-target="#fuelModal">
+                                <a class="dropdown-item" href="<?php echo base_url.'admin/index.php?page=buses/fuel&edit='.$row['id'] ?>">
                                     <span class="fa fa-edit text-primary"></span> تعديل
                                 </a>
                                 <div class="dropdown-divider"></div>
@@ -354,8 +354,10 @@ $(document).ready(function(){
     // إعادة تعبئة النموذج عند فتحه للتعديل
     $('#fuelModal').on('show.bs.modal', function (e) {
         var button = $(e.relatedTarget);
-        var isEdit = button.attr('href') && button.attr('href').includes('edit=');
-        
+        var isEditParam = new URLSearchParams(window.location.search).has('edit');
+        var isEditTrigger = button && button.attr('href') && button.attr('href').includes('edit=');
+        var isEdit = isEditParam || isEditTrigger;
+
         if(!isEdit){
             // إعادة تعيين النموذج للإضافة
             $('#fuelModal form')[0].reset();
@@ -363,8 +365,15 @@ $(document).ready(function(){
             $('#fuelModal input[name="id"]').val('');
             $('#fuelModal input[name="old_receipt_path"]').val('');
             $('#fuelModal #fuel_date').val(new Date().toISOString().split('T')[0]);
+        } else {
+            $('#fuelModal .modal-title').text('تعديل سجل الوقود');
         }
     });
+
+    // فتح نافذة التعديل تلقائياً عند وجود باراميتر ?edit=
+    <?php if(isset($fuel_data['id']) && !empty($fuel_data['id'])): ?>
+        $('#fuelModal').modal('show');
+    <?php endif; ?>
 
     // إظهار/إخفاء حقل اسم المحطة حسب نوع التعبئة
     $('#fuel_type').change(function(){
