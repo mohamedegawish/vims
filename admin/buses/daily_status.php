@@ -19,7 +19,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_status'])){
     $check_query = $conn->query("SELECT id FROM `bus_status` WHERE bus_id = '$bus_id' AND status_date = '$status_date' AND id != '$id'");
     if($check_query->num_rows > 0){
         $_SESSION['error'] = 'تم تسجيل حالة لهذا الباص لهذا اليوم بالفعل';
-        echo '<script>window.location.href = "'.$_SERVER['PHP_SELF'].'";</script>';
+        echo '<script>window.location.href = "'.base_url.'admin/index.php?page=buses/daily_status";</script>';
         exit;
     }
 
@@ -48,7 +48,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_status'])){
         $_SESSION['error'] = 'حدث خطأ في الحفظ: ' . $conn->error;
     }
     
-    echo '<script>window.location.href = "'.$_SERVER['PHP_SELF'].'";</script>';
+    echo '<script>window.location.href = "'.base_url.'admin/index.php?page=buses/daily_status";</script>';
     exit;
 }
 
@@ -57,7 +57,7 @@ if(isset($_GET['delete'])){
     $id = (int)$_GET['delete'];
     $conn->query("DELETE FROM `bus_status` WHERE `id` = '$id'");
     $_SESSION['success'] = 'تم حذف الحالة اليومية بنجاح';
-    echo '<script>window.location.href = "'.$_SERVER['PHP_SELF'].'";</script>';
+    echo '<script>window.location.href = "'.base_url.'admin/index.php?page=buses/daily_status";</script>';
     exit;
 }
 
@@ -238,7 +238,7 @@ if(isset($_SESSION['error'])){
                                 إجراءات
                             </button>
                             <div class="dropdown-menu" role="menu">
-                                <a class="dropdown-item" href="?edit=<?php echo $row['id'] ?>" data-toggle="modal" data-target="#statusModal">
+                                <a class="dropdown-item" href="<?php echo base_url.'admin/index.php?page=buses/daily_status&edit='.$row['id'] ?>">
                                     <span class="fa fa-edit text-primary"></span> تعديل
                                 </a>
                                 <div class="dropdown-divider"></div>
@@ -363,13 +363,19 @@ $(document).ready(function(){
             $('#statusModal #status_date').val(new Date().toISOString().split('T')[0]);
         }
     });
+
+    // فتح نافذة التعديل تلقائياً عند وجود باراميتر ?edit=
+    <?php if(isset($status_data['id']) && !empty($status_data['id'])): ?>
+        $('#statusModal').modal('show');
+        $('#statusModal .modal-title').text('تعديل الحالة اليومية');
+    <?php endif; ?>
 });
 
 // دالة حذف الحالة
 function delete_status(id){
     start_loader();
     $.ajax({
-        url: '?delete='+id,
+        url: '<?php echo base_url?>admin/index.php?page=buses/daily_status&delete='+id,
         method: 'GET',
         success: function(){
             window.location.reload();
