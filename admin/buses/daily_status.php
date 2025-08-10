@@ -332,6 +332,10 @@ if(isset($_SESSION['error'])){
     </div>
 </div>
 
+<!-- pdfMake for PDF generation -->
+<script src="<?php echo base_url ?>plugins/pdfmake/pdfmake.min.js"></script>
+<script src="<?php echo base_url ?>plugins/pdfmake/vfs_fonts.js"></script>
+
 <script>
 $(document).ready(function(){
     // تهيئة جدول البيانات مع إمكانية الفرز والبحث
@@ -413,13 +417,92 @@ function resetFilter(){
 
 // إنشاء تقرير PDF
 function generateStatusReport(){
-    var date = $('#filter_date').val() || 'all';
-    var bus = $('#filter_bus').val() || 'all';
-    var status = $('#filter_status').val() || 'all';
-    
-    start_loader();
-    window.open('generate_report.php?type=status&date='+date+'&bus='+bus+'&status='+status, '_blank');
-    end_loader();
+    try{
+        var dt = $.fn.DataTable.isDataTable('#statusTable') ? $('#statusTable').DataTable() : null;
+        var rows = [];
+        if(dt){
+            var nodes = dt.rows({ search: 'applied' }).nodes();
+            if(nodes.length === 0){
+                alert_toast('لا توجد بيانات للتقرير وفقاً للفلاتر الحالية', 'warning');
+                return;
+            }
+            $(nodes).each(function(idx, tr){
+                var $tds = $(tr).find('td');
+                rows.push([
+                    $tds.eq(0).text().trim(),
+                    $tds.eq(1).text().trim(),
+                    $tds.eq(2).text().trim(),
+                    $tds.eq(3).text().trim(),
+                    $tds.eq(4).text().trim(),
+                    $tds.eq(5).text().trim(),
+                    $tds.eq(6).text().trim()
+                ]);
+            });
+        } else {
+            // fallback without DataTables
+            $('#statusTable tbody tr').each(function(){
+                var $tds = $(this).find('td');
+                rows.push([
+                    $tds.eq(0).text().trim(),
+                    $tds.eq(1).text().trim(),
+                    $tds.eq(2).text().trim(),
+                    $tds.eq(3).text().trim(),
+                    $tds.eq(4).text().trim(),
+                    $tds.eq(5).text().trim(),
+                    $tds.eq(6).text().trim()
+                ]);
+            });
+            if(rows.length === 0){
+                alert_toast('لا توجد بيانات للتقرير', 'warning');
+                return;
+            }
+        }
+
+        var filterDate = $('#filter_date').val();
+        var filterBusText = $('#filter_bus option:selected').text().trim();
+        filterBusText = $('#filter_bus').val() ? filterBusText : 'كل الباصات';
+        var filterStatusText = $('#filter_status option:selected').text().trim();
+        filterStatusText = $('#filter_status').val() ? filterStatusText : 'كل الحالات';
+
+        var header = ['#','الباص','التاريخ','الحالة','الكيلومترات','آخر تحديث','ملاحظات'];
+        var body = [header].concat(rows);
+
+        var now = new Date();
+        var ts = now.toISOString().slice(0,19).replace('T',' ');
+
+        var docDefinition = {
+            pageOrientation: 'landscape',
+            pageMargins: [30, 30, 30, 30],
+            content: [
+                { text: 'تقرير الحالة اليومية للباصات', style: 'title', margin: [0,0,0,10], alignment: 'right' },
+                { text: 'التاريخ الحالي: ' + ts, style: 'meta', alignment: 'right' },
+                { text: 'فلتر التاريخ: ' + (filterDate || 'الكل'), style: 'meta', alignment: 'right' },
+                { text: 'الباص: ' + filterBusText + ' | الحالة: ' + filterStatusText, style: 'meta', margin: [0,0,0,10], alignment: 'right' },
+                {
+                    table: {
+                        headerRows: 1,
+                        widths: ['auto','*','auto','auto','auto','auto','*'],
+                        body: body
+                    },
+                    layout: 'lightHorizontalLines'
+                }
+            ],
+            defaultStyle: {
+                fontSize: 9,
+                alignment: 'right'
+            },
+            styles: {
+                title: { fontSize: 16, bold: true },
+                meta: { fontSize: 10, color: '#555' }
+            }
+        };
+
+        // ملاحظة: لعرض العربية بشكل صحيح قد تحتاج إلى إضافة خط يدعم العربية داخل vfs_fonts
+        pdfMake.createPdf(docDefinition).download('status_report_' + now.toISOString().slice(0,10) + '.pdf');
+    }catch(e){
+        console.error(e);
+        alert_toast('تعذر إنشاء ملف PDF', 'error');
+    }
 }
 
 // دالة عرض التنبيه
