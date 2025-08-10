@@ -399,7 +399,7 @@ $(document).ready(function(){
 function delete_fuel(id){
     start_loader();
     $.ajax({
-        url: '?delete='+id,
+        url: '<?php echo base_url?>admin/index.php?page=buses/fuel&delete='+id,
         method: 'GET',
         success: function(){
             window.location.reload();
